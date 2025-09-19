@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nostosuunnitelma – 14×28 pisteverkko</title>
+  <style>
+    :root{--bg:#f8fafc;--card:#ffffff;--ink:#0f172a;--muted:#64748b;--border:#e2e8f0;--accent:#2563eb}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial}
+    .wrap{max-width:1200px;margin:auto;padding:16px}
+    h1{margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    @media(min-width:1024px){.grid{grid-template-columns:360px 1fr}}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px}
+    .row{display:flex;align-items:center;gap:10px;margin:8px 0}
+    .row label{font-size:13px;color:var(--muted);min-width:190px}
+    .row input[type=range]{width:100%}
+    .row input[type=number], .row select{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;background:#fff}
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+    .stat{background:#f1f5f9;border:1px solid var(--border);border-radius:10px;padding:8px}
+    .stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    .stat .val{font-weight:700}
+    .btn{appearance:none;border:1px solid var(--border);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn:hover{box-shadow:0 1px 6px rgba(0,0,0,.08)}
+    svg{background:#fff;display:block;border:1px solid var(--border);border-radius:8px}
+    .muted{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Nostosuunnitelma – 14×28 pisteverkko</h1>
+    <div class="grid">
+      <!-- Säätimet -->
+      <section class="card">
+        <h3>Ruudukko & ryhmät</h3>
+        <div class="row"><label>Pisteen koko: <span id="lblDotR">6</span> px</label><input id="dotR" type="range" min="2" max="12" value="6"></div>
+        <div class="row"><label>Ryhmäkoko: <span id="lblGroup">8</span> pistettä</label><input id="groupSize" type="range" min="8" max="15" step="1" value="8"></div>
+        <div class="row"><label>Näytä numerointi</label>
+          <select id="numberMode">
+            <option value="cycle15" selected>1–15 (toistuva)</option>
+            <option value="group">Ryhmä (1..N)</option>
+          </select>
+        </div>
+        <div class="row"><label>Ryhmien kehykset</label><label class="row" style="min-width:unset"><input id="showFrames" type="checkbox" checked> Näytä</label></div>
+
+        <h3 style="margin-top:10px">Nostajat & suodatus</h3>
+        <div class="row"><label>Nostajien määrä</label><input id="lifters" type="number" min="1" max="60" value="15"></div>
+        <div class="row"><label>Näytä nostaja</label>
+          <select id="filterLifter"><option value="all">Kaikki</option></select>
+        </div>
+        <div class="row"><label class="row" style="min-width:unset"><input id="showOnlySelected" type="checkbox"> Näytä vain valitun nostajan pisteet</label></div>
+
+        <h3 style="margin-top:10px">Sektorointi</h3>
+        <div class="row"><label class="row" style="min-width:unset"><input id="sectorMode" type="checkbox"> Käytä sektorijakoa</label></div>
+        <div class="row"><label>Sektorin kierto (°): <span id="lblOffset">0</span></label><input id="sectorOffset" type="range" min="0" max="359" step="1" value="0"></div>
+
+        <h3 style="margin-top:10px">Aika-arvio</h3>
+        <div class="row"><label>Tavoitenosto: <span id="lblTarget">30</span> mm</label><input id="target" type="range" min="5" max="60" step="1" value="30"></div>
+        <div class="row"><label>VT-JFS kierrepituus: <span id="lblLead">2.0</span> mm/kierr.</label><input id="lead" type="range" min="0.5" max="5" step="0.1" value="2"></div>
+        <div class="row"><label>Aika / piste / kierros: <span id="lblSec">10</span> s</label><input id="sec" type="range" min="3" max="60" step="1" value="10"></div>
+        <div class="row"><label>Operaattoreita: <span id="lblOps">1</span></label><input id="ops" type="range" min="1" max="8" step="1" value="1"></div>
+        <div class="row"><label>Siirtymä seuraavaan ryhmään: <span id="lblTransfer">15</span> s</label><input id="transfer" type="range" min="0" max="120" step="5" value="15"></div>
+
+        <div class="row"><button id="btnDownload" class="btn">Lataa SVG (nykyinen näkymä)</button></div>
+      </section>
+
+      <!-- Kanvaasi + stats -->
+      <section class="card">
+        <svg id="stage" viewBox="0 0 1280 680" width="100%" height="600" aria-label="Nostokartta"></svg>
+        <div id="helpText" class="muted" style="margin-top:8px">Ensimmäinen ryhmä alkaa ruudukon keskeltä. Numerointi: 1–15 (toistuva) tai ryhmän numero (1..N).</div>
+        <div class="stats" style="margin-top:10px">
+          <div class="stat"><div class="lbl">Pisteitä</div><div class="val" id="stPoints">-</div></div>
+          <div class="stat"><div class="lbl">Ryhmäkoko</div><div class="val" id="stGroupSize">-</div></div>
+          <div class="stat"><div class="lbl">Kierrokset / piste</div><div class="val" id="stPasses">-</div><div class="muted" id="stPassesEq"></div></div>
+          <div class="stat"><div class="lbl">Ryhmiä</div><div class="val" id="stGroups">-</div></div>
+          <div class="stat"><div class="lbl">Aika / ryhmä</div><div class="val" id="stPerGroup">-</div></div>
+          <div class="stat"><div class="lbl">Siirtymät yhteensä</div><div class="val" id="stTransfers">-</div></div>
+          <div class="stat"><div class="lbl">Työaika yhteensä</div><div class="val" id="stWork">-</div></div>
+          <div class="stat"><div class="lbl">Kokonaisaika</div><div class="val" id="stTotal">-</div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const rows=14, cols=28, padding=24;
+      const width=1280, height=680, cx=width/2, cy=height/2;
+
+      // UI
+      const svg=document.getElementById('stage');
+      const dotR=document.getElementById('dotR');
+      const groupSize=document.getElementById('groupSize');
+      const numberMode=document.getElementById('numberMode');
+      const showFrames=document.getElementById('showFrames');
+
+      const lifters=document.getElementById('lifters');
+      const filterLifter=document.getElementById('filterLifter');
+      const showOnlySelected=document.getElementById('showOnlySelected');
+      const sectorMode=document.getElementById('sectorMode');
+      const sectorOffset=document.getElementById('sectorOffset');
+
+      const target=document.getElementById('target');
+      const lead=document.getElementById('lead');
+      const sec=document.getElementById('sec');
+      const ops=document.getElementById('ops');
+      const transfer=document.getElementById('transfer');
+
+      const lblDotR=document.getElementById('lblDotR');
+      const lblGroup=document.getElementById('lblGroup');
+      const lblOffset=document.getElementById('lblOffset');
+      const lblTarget=document.getElementById('lblTarget');
+      const lblLead=document.getElementById('lblLead');
+      const lblSec=document.getElementById('lblSec');
+      const lblOps=document.getElementById('lblOps');
+      const lblTransfer=document.getElementById('lblTransfer');
+
+      const stPoints=document.getElementById('stPoints');
+      const stGroupSize=document.getElementById('stGroupSize');
+      const stPasses=document.getElementById('stPasses');
+      const stPassesEq=document.getElementById('stPassesEq');
+      const stGroups=document.getElementById('stGroups');
+      const stPerGroup=document.getElementById('stPerGroup');
+      const stTransfers=document.getElementById('stTransfers');
+      const stWork=document.getElementById('stWork');
+      const stTotal=document.getElementById('stTotal');
+      const help=document.getElementById('helpText');
+      const btnDownload=document.getElementById('btnDownload');
+
+      // Perusvärit (15)
+      const palette=['#000000','#ff0000','#0000ff','#008000','#ffa500','#800080','#ffff00','#8b4513','#808080','#87ceeb','#ffc0cb','#006400','#00008b','#8b0000','#a9a9a9'];
+      const faded='#cbd5e1';
+
+      function fmtTime(secs){
+        secs=Math.max(0,Math.round(secs));
+        const h=Math.floor(secs/3600);
+        const m=Math.floor((secs%3600)/60);
+        const s=secs%60;
+        const out=[]; if(h) out.push(h+' h'); if(m) out.push(m+' min'); if(!h && !m) out.push(s+' s');
+        return out.join(' ');
+      }
+
+      function buildPoints(){
+        const pts=[];
+        const stepX=(width-2*padding)/(cols-1);
+        const stepY=(height-2*padding)/(rows-1);
+        for(let r=0;r<rows;r++){
+          for(let c=0;c<cols;c++){
+            pts.push({x:padding+c*stepX,y:padding+r*stepY,row:r,col:c});
+          }
+        }
+        return pts;
+      }
+
+      function orderFromCenter(points){
+        return points
+          .map((p)=>{const dx=p.x-cx,dy=p.y-cy;return {...p,d2:dx*dx+dy*dy};})
+          .sort((a,b)=>a.d2-b.d2)
+          .map((p,i)=>({...p,idx:i+1,group:Math.floor(i/Number(groupSize.value))}));
+      }
+
+      function assignLifters(ordered){
+        const nRaw=Number(lifters.value);
+        const n=(!Number.isFinite(nRaw)||nRaw<1)?1:Math.floor(nRaw);
+        const map=new Map(); for(let i=0;i<n;i++) map.set(i+1,[]);
+        if(sectorMode.checked){
+          const twoPi=Math.PI*2; const offsetRad=(Number(sectorOffset.value)%360)*Math.PI/180;
+          ordered.forEach(p=>{
+            const ang=Math.atan2(p.y-cy,p.x-cx); let a=ang-offsetRad; if(a<0) a+=twoPi;
+            const sector=Math.min(n-1,Math.floor(a/(twoPi/n)));
+            map.get(sector+1).push(p);
+          });
+          for(const [k,arr] of map.entries()){arr.sort((a,b)=>a.d2-b.d2)}
+        } else {
+          ordered.forEach((p,i)=>{const who=(i%n)+1; map.get(who).push(p)});
+        }
+        return map;
+      }
+
+      function populateLifterDropdown(){
+        const prev=filterLifter.value;
+        const nRaw=Number(lifters.value);
+        const n=(!Number.isFinite(nRaw)||nRaw<1)?1:Math.floor(nRaw);
+        filterLifter.innerHTML='<option value="all">Kaikki</option>';
+        for(let i=1;i<=n;i++){
+          const opt=document.createElement('option'); opt.value=String(i); opt.textContent='Nostaja '+i; filterLifter.appendChild(opt);
+        }
+        if(prev && (prev==='all'||(Number(prev)>=1&&Number(prev)<=n))){ filterLifter.value=prev } else { filterLifter.value='all' }
+      }
+
+      function drawBase(){
+        while(svg.firstChild) svg.removeChild(svg.firstChild);
+        const bg=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        bg.setAttribute('x',0); bg.setAttribute('y',0); bg.setAttribute('width',width); bg.setAttribute('height',height); bg.setAttribute('fill','#ffffff');
+        svg.appendChild(bg);
+        const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+        t.setAttribute('x',width/2); t.setAttribute('y',22); t.setAttribute('text-anchor','middle'); t.setAttribute('font-size','16'); t.setAttribute('fill','#0f172a');
+        t.textContent='Nostopisteet (valitun numerointitavan mukaan)'; svg.appendChild(t);
+      }
+
+      function render(){
+        try{
+          // Päivitä labelit
+          document.title = 'Nostosuunnitelma – 14×28 pisteverkko';
+          lblDotR.textContent=dotR.value; lblGroup.textContent=groupSize.value; lblOffset.textContent=sectorOffset.value;
+          lblTarget.textContent=target.value; lblLead.textContent=Number(lead.value).toFixed(1); lblSec.textContent=sec.value; lblOps.textContent=ops.value; lblTransfer.textContent=transfer.value;
+
+          const pts=orderFromCenter(buildPoints());
+          const lifterMap=assignLifters(pts);
+          populateLifterDropdown();
+          const selected=filterLifter.value; // 'all' tai numero
+
+          // Ryhmittely piirtämistä varten
+          const groups=[]; for(const p of pts){ (groups[p.group]||(groups[p.group]=[])).push(p); }
+
+          drawBase();
+
+          // Piirrä ryhmäkehykset + pisteet
+          groups.forEach((g,gi)=>{
+            const color=palette[gi%palette.length];
+
+            if(showFrames.checked && g && g.length){
+              const xs=g.map(p=>p.x), ys=g.map(p=>p.y);
+              const minX=Math.min(...xs)-Number(dotR.value)*2, maxX=Math.max(...xs)+Number(dotR.value)*2;
+              const minY=Math.min(...ys)-Number(dotR.value)*2, maxY=Math.max(...ys)+Number(dotR.value)*2;
+              const frame=document.createElementNS('http://www.w3.org/2000/svg','rect');
+              frame.setAttribute('x',minX); frame.setAttribute('y',minY); frame.setAttribute('width',maxX-minX); frame.setAttribute('height',maxY-minY);
+              frame.setAttribute('fill','none'); frame.setAttribute('stroke',color); frame.setAttribute('stroke-dasharray','6 4'); frame.setAttribute('stroke-width','1.2');
+              svg.appendChild(frame);
+            }
+
+            (g||[]).forEach(p=>{
+              // Suodatus näkyvyys
+              let visible=true;
+              if(selected!=='all'){
+                const list=lifterMap.get(Number(selected))||[];
+                visible=list.some(x=>x.idx===p.idx);
+              }
+              const alpha=(selected!=='all' && showOnlySelected.checked && !visible)?0:1;
+
+              // Piste
+              const circ=document.createElementNS('http://www.w3.org/2000/svg','circle');
+              circ.setAttribute('cx',p.x); circ.setAttribute('cy',p.y); circ.setAttribute('r',dotR.value);
+              circ.setAttribute('fill',visible? color : faded); circ.setAttribute('opacity',String(alpha));
+              svg.appendChild(circ);
+
+              // Numero
+              const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+              label.setAttribute('x',p.x+Number(dotR.value)+2); label.setAttribute('y',p.y-2);
+              label.setAttribute('font-size','10'); label.setAttribute('fill',visible? '#111827':'#94a3b8'); label.setAttribute('opacity',String(alpha));
+              label.textContent=(numberMode.value==='group')? String(p.group+1) : String(((p.idx-1)%15)+1);
+              svg.appendChild(label);
+            });
+          });
+
+          // Aika-arvio
+          const totalPoints=rows*cols;
+          const gSize=Number(groupSize.value);
+          const passes=Math.max(1,Math.ceil(Number(target.value)/Math.max(Number(lead.value),0.0001)));
+          const groupsCount=Math.ceil(totalPoints/gSize);
+          const totalTurns=passes*totalPoints;
+          const secondsWork=(totalTurns*Number(sec.value))/Math.max(Number(ops.value),1);
+          const secondsTransfers=Math.max(groupsCount-1,0)*Number(transfer.value);
+          const secondsTotal=secondsWork+secondsTransfers;
+          const secondsPerGroupAll=(passes*gSize*Number(sec.value))/Math.max(Number(ops.value),1)+Number(transfer.value);
+
+          stPoints.textContent=totalPoints;
+          stGroupSize.textContent=gSize;
+          stPasses.textContent=passes;
+          stPassesEq.textContent=`${target.value} / ${Number(lead.value).toFixed(1)} = ${(Number(target.value)/Number(lead.value)).toFixed(1)}`;
+          stGroups.textContent=groupsCount;
+          stPerGroup.textContent=fmtTime(secondsPerGroupAll);
+          stTransfers.textContent=fmtTime(secondsTransfers);
+          stWork.textContent=fmtTime(secondsWork);
+          stTotal.textContent=fmtTime(secondsTotal);
+
+          if(help){
+            help.textContent='Ensimmäinen ryhmä alkaa ruudukon keskeltä. Numerointi: '
+              +(numberMode.value==='group'?'ryhmän numero (1..N)':'1–15 (toistuva)')+'.';
+          }
+        } catch(err){
+          console.error(err);
+          while(svg.firstChild) svg.removeChild(svg.firstChild);
+          const tx=document.createElementNS('http://www.w3.org/2000/svg','text');
+          tx.setAttribute('x',20); tx.setAttribute('y',40);
+          tx.setAttribute('font-size','14'); tx.setAttribute('fill','#ef4444');
+          tx.textContent='Virhe renderöinnissä: '+(err && err.message ? err.message : String(err));
+          svg.appendChild(tx);
+        }
+      }
+
+      function downloadSVG(){
+        const serializer=new XMLSerializer();
+        const svgStr=serializer.serializeToString(svg);
+        const blob=new Blob([svgStr],{type:'image/svg+xml;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');
+        a.href=url; a.download=`nostosuunnitelma-14x28-g${groupSize.value}.svg`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }
+
+      // Alustus
+      (function init(){
+        const n=Number(lifters.value)||1;
+        for(let i=1;i<=n;i++){
+          const opt=document.createElement('option');
+          opt.value=String(i); opt.textContent='Nostaja '+i; filterLifter.appendChild(opt);
+        }
+      })();
+
+      // Kuuntelijat
+      [dotR,groupSize,numberMode,showFrames,lifters,filterLifter,showOnlySelected,sectorMode,sectorOffset,target,lead,sec,ops,transfer].forEach(el=>{
+        el.addEventListener('input',render);
+        el.addEventListener('change',render);
+      });
+      btnDownload.addEventListener('click',downloadSVG);
+
+      render();
+    })();
+  </script>
+</body>
+</html>
